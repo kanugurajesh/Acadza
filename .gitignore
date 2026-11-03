@@ -1,0 +1,9 @@
+# Acadza proprietary content and secrets: never commit
+data/
+.env
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+app/review.html
+docs/frames/

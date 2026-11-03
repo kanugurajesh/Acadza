@@ -1,11 +1,136 @@
-# Acadza Question Bank Doctor
+<div align="center">
 
-An AI pipeline that audits and repairs a JEE/NEET question bank in **Acadza's own format**. It reads questions whose
-maths is stored as images, re-tags them to Acadza's chapter → concept → sub-concept syllabus, re-solves them to check
-the answer key, and flags off-chapter, untagged and duplicate questions. Output is a correction file in Acadza's own
-field names, ready to review and import.
+# 🩺 Acadza Question Bank Doctor
 
-Built as a work sample for the **AI Intern** role at Acadza.
+**An AI pipeline that audits and repairs Acadza's JEE question bank, in Acadza's own format and syllabus, and shows
+its evidence for every change.**
+
+![Questions audited](https://img.shields.io/badge/real%20questions%20audited-449-1f5eff)
+![Syllabus](https://img.shields.io/badge/syllabus-2%2C423%20sub--concepts-0f8a4b)
+![Answer keys](https://img.shields.io/badge/answer%20keys%20confirmed-126%20%2F%20127-0f8a4b)
+![Cost](https://img.shields.io/badge/total%20API%20spend-%240.19-b26a00)
+![Models](https://img.shields.io/badge/models-open--weight%20on%20Groq-5d6470)
+
+<img src="docs/img/demo.gif" alt="Demo: filtering off-chapter questions, comparing Acadza's stored question with the clean version, accepting a re-tag, and checking an answer key" width="100%">
+
+*The review screen running on real output: filter → compare → check the evidence → accept → export a patch.*
+
+</div>
+
+---
+
+## The 60-second version
+
+> **Chanakya is already strong. What holds it back is the data underneath it.** I audited 449 real questions served
+> by the Practice DOST and built a tool that fixes the problems it finds, with a teacher in the loop.
+
+| Finding | Why it matters |
+|---|---|
+| 🏷️ **1 in 5 questions has no sub-concept tag** | Danger areas, remedies, backlog plans and adaptive difficulty all work at sub-concept level, so these questions are invisible to them. |
+| 🖼️ **14% of questions (18% of solutions) store maths as images** | Neither Chanakya nor search can read them. The Doctor transcribes them to LaTeX (5 / 5 spot-checked exact). |
+| 🧭 **7.8% are served in an assignment for a different chapter** | One binomial-coefficient question is tagged *Hyperbola*. The Doctor says which side is wrong: the tag or the selector. |
+| ✅ **126 / 127 answer keys confirmed, 1 real defect found** | A single-correct question with two correct options. A small model settles 96% of keys, for **under $0.001 per key**. |
+| ⚠️ **My first tagger was *worse* than Acadza's tags** | It scored 12 / 30 against Acadza's 27 / 30 on a hand-labelled gold set, which caught it before it touched the bank. v3 reads Acadza's own sub-concept definitions and scores 12 / 13 so far. |
+
+**This is triage, not an oracle.** The Doctor turns a question bank into a short, evidence-backed list that a teacher
+can clear in minutes. It exports the accepted fixes in Acadza's own fields (`chapter`, `concept`, `subConcept`,
+`tagByAI: true`, `questionMarkdown`).
+
+## Screenshots
+
+<table>
+<tr>
+<td width="50%"><img src="docs/img/review-off-chapter.png" alt="Off-chapter question: Acadza's tag vs the Doctor's, with reason and judge verdict"></td>
+<td width="50%"><img src="docs/img/review-image-maths.png" alt="Question whose maths was stored as images, transcribed to LaTeX and tagged for the first time"></td>
+</tr>
+<tr>
+<td><b>Off-chapter question.</b> Acadza files it under <i>Permutation and Combination</i>. The Doctor proposes
+<i>Binomial Theorem → Formula and properties of nCr</i> and gives a reason, and a judge from a different model family
+agrees.</td>
+<td><b>Image maths → LaTeX.</b> The question is rendered and read by a vision model. It had no concept or
+sub-concept tag; now it has one from Acadza's syllabus.</td>
+</tr>
+<tr>
+<td><img src="docs/img/review-answer-key.png" alt="Answer key check: both models disagree with the key; Acadza's own solution supports the key"></td>
+<td><img src="docs/img/review-dark.png" alt="Review screen in dark mode"></td>
+</tr>
+<tr>
+<td><b>Answer-key check.</b> Two models answer (D), the key says (B), and Acadza's own solution reaches (B).
+Solving it by hand showed that <b>both are correct</b>: a real defect in a single-correct question.</td>
+<td><b>Dark mode</b>, plus filters for untagged questions, image maths, low confidence and judge verdicts.</td>
+</tr>
+</table>
+
+## Architecture
+
+```mermaid
+flowchart TD
+  subgraph S1["1 · Collect"]
+    APP["Acadza web app<br/>own logged-in session"] -->|"Practice DOST wizard"| RAW[("raw question JSON")]
+    JS["public JS bundles"] -->|"extract_taxonomy.py"| TAX[("Acadza syllabus<br/>104 chapters · 2,423 sub-concepts")]
+  end
+  RAW --> AUD["audit.py<br/>rule-based flags"]
+  subgraph S2["2 · Read"]
+    AUD --> FMT{"how is the<br/>maths stored?"}
+    FMT -->|"MathML"| MML["mathml.py<br/>deterministic · 0 tokens"]
+    FMT -->|"images"| REN["render_questions.js<br/>one PNG per question"] --> VIS["vision model<br/>qwen3.8-27b"]
+  end
+  MML --> MD[("clean Markdown + LaTeX")]
+  VIS --> MD
+  subgraph S3["3 · Diagnose"]
+    TAG["tag_v3.py<br/>gpt-oss-120b · strict enum<br/>of real syllabus triples"]
+    VER["verify.py<br/>small → large model cascade"]
+    DUP["dedupe.py<br/>near-duplicates"]
+    JDG["judge.py<br/>different model family"]
+  end
+  MD --> TAG & VER & DUP
+  TAX --> TAG
+  TAG --> JDG
+  subgraph S4["4 · Review, ship, measure"]
+    REV["review.html<br/>teacher accepts / rejects"] --> PATCH[("patch in Acadza's fields<br/>tagByAI: true")]
+    EVAL["eval/ → REPORT.md<br/>gold set · controls · cost"]
+  end
+  S3 --> S4
+```
+
+**Cheap models first; expensive ones only where they change the outcome.** Answer keys go through a cascade, so the
+large model and the publisher's solution are used only when needed:
+
+```mermaid
+flowchart TD
+  Q["question + Acadza key"] --> A["gpt-oss-20b solves blind"]
+  A -->|"matches key (96% of cases)"| OK(["key_confirmed"])
+  A -->|"differs"| B["gpt-oss-120b solves blind"]
+  B -->|"matches key"| OK
+  B -->|"both models agree against the key"| C["gpt-oss-120b reads Acadza's own worked solution"]
+  B -->|"all three differ"| U(["unresolved → teacher"])
+  C -->|"solution reaches the models' answer"| W(["key_likely_wrong → teacher"])
+  C -->|"solution supports the key, or is unclear"| R(["needs_review → teacher"])
+```
+
+**Every tag is a real syllabus entry.** The tagger sees only the concept → sub-concept trees of 2–3 candidate
+chapters. It must answer with one exact `(chapter, concept, subConcept)` triple from a strict JSON-schema `enum`, so
+it can't invent a syllabus entry or misspell one.
+
+## What this unlocks for Acadza
+
+- **Sub-concept DOSTs that cover the whole bank:** danger areas, remedies, backlog plans and formula sheets gain the
+  ~21% of questions they can't place today.
+- **Chanakya that can read a student's own questions:** today it asks for a screenshot. With clean Markdown + LaTeX
+  it can read them as text.
+- **The "Adaptive (Coming soon)" level:** adaptive difficulty first needs sub-concept tags and answer keys you can
+  trust. This is that groundwork.
+- **A content-quality gate:** the same pipeline can check every new upload before students see it, so the bank stays
+  clean.
+
+## If I joined: the first 30 days
+
+| Week | Plan |
+|---|---|
+| 1 | Finish the Maths run (limited only by API quota); have a teacher sign off on the gold set and the flagged keys. |
+| 2 | Run Physics and Chemistry (the pipeline and syllabus file already cover them). Calibrate tagger confidence against teacher decisions so that confident cases can skip review. |
+| 3 | Plug the review screen into the content team's workflow, writing straight to `tagByAI` / `questionMarkdown`. |
+| 4 | Run it nightly on newly added questions; publish a bank-health dashboard (untagged %, image-only %, off-chapter %). |
 
 ## Why this, and not another chatbot
 Acadza already has a strong AI assistant (Chanakya: tool use, memory, multi-step study journeys, Hinglish). What holds
@@ -104,6 +229,10 @@ eval/
   report.py               # → REPORT.md (every number computed, none typed)
 app/
   build_review.py         # → app/review.html (local only: embeds Acadza content)
+docs/
+  capture_screens.js      # README screenshots + demo frames from app/review.html (headless Edge)
+  make_gif.py             # → docs/img/demo.gif
+  img/                    # README images
 run_all.py                # resume every stage in order
 REPORT.md                 # evaluation report
 data/                     # NOT committed: Acadza content (see Privacy)
@@ -163,6 +292,10 @@ cached, and it stops cleanly at the daily limit.
 ```bash
 .venv/Scripts/python -I run_all.py
 ```
+To refresh the README screenshots and demo GIF after a run:
+```bash
+node docs/capture_screens.js && .venv/Scripts/python -I docs/make_gif.py
+```
 To re-run only the free deterministic conversion (for example after changing `doctor/mathml.py`):
 ```bash
 .venv/Scripts/python -I doctor/normalize.py --no-api
@@ -178,6 +311,8 @@ To re-run only the free deterministic conversion (for example after changing `do
 ## Privacy and responsible use
 - `data/` holds Acadza's proprietary question content. It's in `.gitignore` and must not be published. Public demos
   should use public JEE PYQs.
+- The README screenshots and demo show a handful of Acadza questions, so **keep this repository private**, or
+  regenerate the images from public JEE PYQs before making it public.
 - Collection runs only inside the user's own logged-in session, at human pace, through the normal UI.
 - Security observations in ISSUES.md (#7, #17) were found by reading public files only. Nothing was exploited, and
   secret values are not reproduced.
