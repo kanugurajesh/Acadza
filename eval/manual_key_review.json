@@ -1,0 +1,19 @@
+{
+ "method": "Every question the cascade flagged (key_likely_wrong / needs_review) was solved by hand by the assistant (Claude) during the build. Not teacher-verified.",
+ "reviews": {
+  "6a030132663ff8094ab1cd53": {
+   "pipeline_status": "key_likely_wrong",
+   "verdict": "false_alarm_pipeline_bug",
+   "acadza_key_correct": true,
+   "working": "Reciprocal roots => c=a; positive => b/a<0; distinct => b^2>4a^2 => b/a<-2. af'(1)=a(2a+b)=a^2(2+b/a)<0, so (B) is true and the INCORRECT options are A, C, D = Acadza's key.",
+   "cause": "The Doctor's MathML converter emitted a literal '<' and '>' in LaTeX; a later HTML-tag strip deleted the text between them, dropping option (C). Fixed in doctor/mathml.py (now emits \\lt / \\gt); 39 questions and 56 solutions were affected and were re-normalised and re-checked."
+  },
+  "6a62745a9fc11309026096c9": {
+   "pipeline_status": "needs_review",
+   "verdict": "question_defect_two_correct_options",
+   "acadza_key_correct": "partly",
+   "working": "Sum_{k=1}^{n} C_k C_{k-1} = coefficient of x^{n-1} in (1+x)^{2n} = 2nC(n-1). Option (D) 2nC(n+1) equals 2nC(n-1) by symmetry. Option (B): (2n+2)C(n+1) = 2nC(n+1) + 2*2nC(n) + 2nC(n-1) = 2*2nC(n-1) + 2*2nC(n), so (1/2)(2n+2)C(n+1) - 2nC(n) = 2nC(n-1). Both B and D are correct.",
+   "recommendation": "Single-correct question with two correct options: change option (D) or make the question multi-correct with key [B, D]."
+  }
+ }
+}

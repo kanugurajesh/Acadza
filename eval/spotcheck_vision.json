@@ -1,0 +1,13 @@
+{
+ "method": "Random sample (seed 3) of vision transcriptions; each compared by eye against the rendered original PNG (data/render/<id>_q.png). Checked by the assistant during the build; a teacher should repeat on a larger sample.",
+ "date": "2026-11-03",
+ "checked": [
+  {"id": "60ec65b8b970c637a9f9ed01", "faithful": true, "note": "two squared complex fractions, |z|=1 condition, 4 options exact"},
+  {"id": "5fe2ce3b32f52705ffc0e893", "faithful": true, "note": "2^{2x} - 8*2^x = -12; log fractions in options exact"},
+  {"id": "5f8aecda485eab06f5662b4a", "faithful": true, "note": "three quadratics and inequality options exact"},
+  {"id": "62572fa2a7c2062b0d3760fc", "faithful": true, "note": "numerical-answer question; original has no options"},
+  {"id": "60b796133711a205184b6f36", "faithful": true, "note": "option (C) ^{37}C_6 transcribed correctly"}
+ ],
+ "faithful": 5,
+ "total": 5
+}

@@ -1,0 +1,13 @@
+{
+  "name": "acadza-question-bank-doctor",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AI pipeline that audits and repairs an Acadza-format JEE question bank",
+  "scripts": {
+    "collect": "node collect/collect_questions.js data/raw",
+    "audit": "python -I doctor/audit.py data/raw data/taxonomy/jee_taxonomy.json data/audit.json"
+  },
+  "dependencies": {
+    "playwright-core": "1.56.1"
+  }
+}
